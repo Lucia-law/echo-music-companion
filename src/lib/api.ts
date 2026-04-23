@@ -225,7 +225,7 @@ function parseBingResults(html: string, limit: number): SearchResult[] {
 
 export async function fetchPageContent(
   url: string,
-): Promise<{ title?: string; content?: string; metaTags?: Record<string, string> } | null> {
+): Promise<{ title?: string; content?: string; metaTags?: Record<string, string>; finalUrl?: string } | null> {
   try {
     const response = await fetch(url, {
       headers: {
