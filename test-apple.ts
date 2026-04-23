@@ -52,7 +52,7 @@ async function testAppleMusic() {
     }
 
   } catch (e) {
-    console.error('失败:', e.message);
+    console.error('失败:', e instanceof Error ? e.message : String(e));
   }
 }
 
