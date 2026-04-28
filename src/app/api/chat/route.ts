@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of streamLLM(llmMessages, { temperature: 1.0, model: 'deepseek-chat' })) {
+        for await (const chunk of streamLLM(llmMessages, { temperature: 1.0, model: 'DeepSeek-V4-Flash', thinking: false })) {
           const data = `data: ${JSON.stringify({ content: chunk })}\n\n`;
           controller.enqueue(encoder.encode(data));
         }

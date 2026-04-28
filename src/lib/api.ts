@@ -10,6 +10,7 @@ export interface LLMConfig {
   apiBase?: string;
   model?: string;
   temperature?: number;
+  thinking?: boolean;
 }
 
 export async function* streamLLM(
@@ -39,19 +40,27 @@ export async function* streamLLM(
     }
 
     try {
-      const response = await fetch(`${apiBase}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
+      const body: Record<string, unknown> = {
           model,
           messages,
           temperature,
           stream: true,
-        }),
-      });
+        };
+
+        if (config.thinking !== undefined) {
+          body.extra_body = {
+            thinking: { type: config.thinking ? 'enabled' : 'disabled' },
+          };
+        }
+
+        const response = await fetch(`${apiBase}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
 
       if (!response.ok) {
         const errorText = await response.text();

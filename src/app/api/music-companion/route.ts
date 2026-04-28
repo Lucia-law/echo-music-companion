@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        for await (const chunk of streamLLM(messages, { temperature: 1.5, model: 'deepseek-reasoner' })) {
+        for await (const chunk of streamLLM(messages, { temperature: 1.5, model: 'DeepSeek-V4-Flash', thinking: true })) {
           const data = `data: ${JSON.stringify({ content: chunk })}\n\n`;
           controller.enqueue(encoder.encode(data));
         }
