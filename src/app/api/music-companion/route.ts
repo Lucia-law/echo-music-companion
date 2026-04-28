@@ -27,7 +27,8 @@ const SYSTEM_PROMPT = `你是听歌搭子，朋友之间聊歌，不打分评人
 歌手：{artist}
 歌词：{lyrics}
 热评：{comments}
-请基于以上信息回复。`;
+
+注意：如果这首歌是其他语言的（如日语、韩语、英语等），直接使用原始歌词理解和回应，不要抓取或使用任何译文版本。`;
 
 export async function POST(request: NextRequest) {
   const { songName, artist, platform, songId } = (await request.json()) as {
@@ -203,7 +204,7 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        for await (const chunk of streamLLM(messages, { temperature: 1.5, model: 'DeepSeek-V4-Flash', thinking: true })) {
+        for await (const chunk of streamLLM(messages, { temperature: 1.5, model: 'deepseek-v4-flash', thinking: true })) {
           const data = `data: ${JSON.stringify({ content: chunk })}\n\n`;
           controller.enqueue(encoder.encode(data));
         }
