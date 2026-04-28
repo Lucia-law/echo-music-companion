@@ -101,7 +101,8 @@ export async function* streamLLM(
             try {
               const parsed = JSON.parse(data);
               console.log('[LLM stream] raw delta:', JSON.stringify(parsed).slice(0, 200));
-              const content = parsed.choices?.[0]?.delta?.content;
+              const delta = parsed.choices?.[0]?.delta;
+              const content = delta?.content;
               if (content) {
                 yield content;
               }

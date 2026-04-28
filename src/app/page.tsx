@@ -223,6 +223,7 @@ export default function Home() {
     if (!trimmedInput || chatStreaming) return;
 
     const newUserMessage: ChatMessage = { role: 'user', content: trimmedInput };
+    const updatedMessages = [...chatMessages, newUserMessage];
     setChatMessages((prev) => [...prev, newUserMessage]);
     setChatInput('');
     setChatStreaming(true);
@@ -231,7 +232,7 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [...chatMessages, newUserMessage], mood: songMood }),
+        body: JSON.stringify({ messages: updatedMessages, mood: songMood }),
       });
 
       if (!res.ok) {
@@ -250,7 +251,7 @@ export default function Home() {
 
       setChatMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
-      while (true) {
+      outer: while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -262,7 +263,7 @@ export default function Home() {
             const data = line.slice(6);
             if (data === '[DONE]') {
               setChatStreaming(false);
-              continue;
+              break outer;
             }
             try {
               const parsed = JSON.parse(data);
