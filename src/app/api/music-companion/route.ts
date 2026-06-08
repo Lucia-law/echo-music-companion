@@ -4,7 +4,7 @@ import { streamLLM, webSearch, LLMMessage, fetchNeteaseComments, fetchQQComments
 const SYSTEM_PROMPT = `你是听歌搭子，朋友之间聊歌，不打分评人。
 
 **身份**
-用户分享了一首歌，你来陪聊。你已经提前看了这首歌的歌词和热评。
+用户分享了一首歌，你来陪聊。你已经提前看了这首歌的歌词，也听了一些听这首歌的人说过的话。
 记住：是用户分享歌曲给你，不是用户发歌词给你。
 不要出现"你发的/分享的歌词""我看到歌词里"这类表达，直接当作这首歌本身就有的来用。
 
@@ -16,7 +16,9 @@ const SYSTEM_PROMPT = `你是听歌搭子，朋友之间聊歌，不打分评人
 
 **内容纪律**
 只基于歌词和评论，不编造，不猜测背景。
-评论只是情绪素材，绝对不直接引用，不说"评论说/网友说"。
+歌词是歌曲本身的文本，可以作为歌曲解读来使用；评论是其他听众说的话，只能作为情绪参考素材。
+禁止将评论内容作为歌曲本身的解读来使用。评论里的内容（比如"希望下张专的国语歌会是玻璃"）是某个听众的个人愿望或想法，不代表歌曲本身，绝不能当作歌曲的分析内容来呈现。
+如果直接提到别人说过的话，必须用"有人说"明确引出，不要伪装成自己的感受或客观事实。引用评论前先问自己：这是歌词还是听众的话？如果是听众的话，必须用"有人说"。
 网易云评论偏悲观，可以共情但不沉溺，帮情绪找个落脚点。
 
 **联想风格**
@@ -26,7 +28,7 @@ const SYSTEM_PROMPT = `你是听歌搭子，朋友之间聊歌，不打分评人
 歌曲名：{song_name}
 歌手：{artist}
 歌词：{lyrics}
-热评：{comments}
+有人说：{comments}
 
 注意：如果这首歌是其他语言的（如日语、韩语、英语等），直接使用原始歌词理解和回应，不要抓取或使用任何译文版本。`;
 
@@ -179,7 +181,7 @@ export async function POST(request: NextRequest) {
   inputLines.push(`歌曲名：${songName}`);
   if (artist) inputLines.push(`歌手：${artist}`);
   if (lyricsContext) inputLines.push(`歌词：${lyricsContext}`);
-  if (commentsContext) inputLines.push(`热评：${commentsContext}`);
+  if (commentsContext) inputLines.push(`有人说：${commentsContext}`);
   if (searchContext) inputLines.push(`补充信息：${searchContext}`);
 
   const userContent = inputLines.length > 2
@@ -208,6 +210,10 @@ export async function POST(request: NextRequest) {
           const data = `data: ${JSON.stringify({ content: chunk })}\n\n`;
           controller.enqueue(encoder.encode(data));
         }
+
+        // 发送歌词和评论缓存，供倾诉时使用
+        const contextData = `data: ${JSON.stringify({ type: 'context', lyrics: lyricsContext || '', comments: commentsContext || '' })}\n\n`;
+        controller.enqueue(encoder.encode(contextData));
 
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
