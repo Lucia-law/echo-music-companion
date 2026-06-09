@@ -122,8 +122,8 @@ function StarmapContent() {
     const padding = 50;
     const usableWidth = containerWidth - padding * 2;
 
-    // 动态高度：歌少时不高，歌多时舒展
-    const containerHeight = Math.max(300, Math.min(700, starCount * 90));
+    // 动态高度：紧凑，给脉络留空间
+    const containerHeight = Math.max(200, Math.min(350, starCount * 70));
     const usableHeight = containerHeight - padding * 2;
 
     // 使用固定种子确保同一记录位置一致
@@ -349,7 +349,7 @@ function StarmapContent() {
           </button>
         </div>
         {/* 空间名 */}
-        <div className="text-center mb-12 animate-fade-up">
+        <div className="text-center mb-6 animate-fade-up">
           <h1 className="font-serif text-3xl md:text-4xl font-normal text-warm-text tracking-[0.3em] mb-4">
             {spaceName}
           </h1>
@@ -385,7 +385,7 @@ function StarmapContent() {
             <div
               ref={containerRef}
               className="relative w-full animate-fade-in"
-              style={{ height: Math.max(300, Math.min(700, records.length * 90)) }}
+              style={{ height: Math.max(200, Math.min(350, records.length * 70)) }}
             >
               {/* 背景星尘 */}
               {bgDust}
@@ -431,7 +431,7 @@ function StarmapContent() {
             </div>
 
             {/* 情绪时间流 */}
-            <div className="mt-20 animate-fade-in">
+            <div className="mt-6 animate-fade-in">
               <div className="flex items-center justify-between mb-8">
                 <p className="text-warm-text-dim/55 text-sm tracking-[0.2em]">脉络</p>
                 {timeline.length === 0 && (
