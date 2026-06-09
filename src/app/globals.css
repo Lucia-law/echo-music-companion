@@ -53,10 +53,10 @@
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
 
-  --color-warm-bg: #111113;
-  --color-warm-surface: #1e1a19;
-  --color-warm-surface-2: #2a2422;
-  --color-warm-border: #3a3330;
+  --color-warm-bg: #191719;
+  --color-warm-surface: #252120;
+  --color-warm-surface-2: #312b29;
+  --color-warm-border: #443d3a;
   --color-warm-amber: #d4a056;
   --color-warm-amber-dim: #b8893f;
   --color-warm-rose: #c47d7d;

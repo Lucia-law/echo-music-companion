@@ -64,13 +64,19 @@ export async function POST(request: NextRequest) {
     const parsedTimeline = JSON.parse(cleaned);
 
     // 配对每条脉络对应的歌曲信息和创建时间，保证前端可排序
-    const timeline = parsedTimeline.map((entry: any, i: number) => ({
-      date: entry.date,
-      text: entry.text,
-      songName: records[i]?.songName || '',
-      artist: records[i]?.artist || '',
-      createdAt: records[i]?.createdAt || '',
-    }));
+    const timeline = parsedTimeline.map((entry: any, i: number) => {
+      const d = new Date(records[i]?.createdAt || '');
+      const hour = d.getHours();
+      const period = hour < 6 ? '凌晨' : hour < 12 ? '上午' : hour < 18 ? '下午' : '晚上';
+      return {
+        date: entry.date,
+        text: entry.text,
+        songName: records[i]?.songName || '',
+        artist: records[i]?.artist || '',
+        createdAt: records[i]?.createdAt || '',
+        period,
+      };
+    });
 
     return NextResponse.json({ timeline });
   } catch (error) {
@@ -78,12 +84,15 @@ export async function POST(request: NextRequest) {
     // 降级：用简单格式返回
     const fallback = records.map((r) => {
       const d = new Date(r.createdAt);
+      const hour = d.getHours();
+      const period = hour < 6 ? '凌晨' : hour < 12 ? '上午' : hour < 18 ? '下午' : '晚上';
       return {
         date: `${d.getMonth() + 1}.${d.getDate()}`,
         text: r.moodAtmosphere || '听了一首歌',
         songName: r.songName,
         artist: r.artist,
         createdAt: r.createdAt,
+        period,
       };
     });
     return NextResponse.json({ timeline: fallback });

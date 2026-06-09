@@ -35,6 +35,7 @@ interface TimelineEntry {
   songName: string;
   artist: string;
   createdAt: string;
+  period?: string;
 }
 
 function formatDate(dateStr: string): string {
@@ -340,12 +341,21 @@ function StarmapContent() {
       {stardust}
       <main className="w-full max-w-2xl mx-auto px-6 pt-20 pb-20 relative z-10 flex-1">
         {/* 顶部导航 */}
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-between items-center mb-4">
           <button
             onClick={() => router.push('/')}
             className="text-warm-text-dim/60 text-sm tracking-wide hover:text-warm-text-dim/80 transition-colors duration-300"
           >
             ← 听歌去
+          </button>
+          <button
+            onClick={() => {
+              localStorage.removeItem('huixiang_space_name');
+              router.push('/');
+            }}
+            className="text-warm-text-dim/40 text-xs tracking-wider hover:text-warm-rose/60 transition-colors duration-300"
+          >
+            退出当前回响之地
           </button>
         </div>
         {/* 空间名 */}
@@ -455,6 +465,9 @@ function StarmapContent() {
                       />
                       <p className="text-warm-text-dim/55 text-xs tracking-wider mb-1">
                         {entry.date}
+                        {entry.period && (
+                          <span className="text-warm-text-dim/40 ml-1.5">{entry.period}</span>
+                        )}
                         {entry.songName && (
                           <span className="text-warm-amber/70 ml-3">{entry.songName}</span>
                         )}
