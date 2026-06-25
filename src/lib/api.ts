@@ -670,12 +670,6 @@ export async function searchNeteaseSong(songName: string, artist?: string): Prom
   }
 }
 
-export interface CommentInfo {
-  content: string;
-  userName: string;
-  likedCount: number;
-}
-
 export interface LyricInfo {
   lyric: string;
   translation?: string;
@@ -726,76 +720,3 @@ export async function fetchNeteaseLyrics(songId: string): Promise<LyricInfo | nu
   }
 }
 
-export async function fetchNeteaseComments(songId: string, limit: number = 15): Promise<CommentInfo[]> {
-  try {
-    const response = await fetch(`https://music.163.com/api/v1/resource/comments/R_SO_4_${songId}?limit=${limit}`, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://music.163.com/',
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!response.ok) {
-      console.log('[netease-comments] API request failed:', response.status);
-      return [];
-    }
-
-    const data = await response.json();
-    
-    if (data.hotComments && data.hotComments.length > 0) {
-      return data.hotComments.map((c: any) => ({
-        content: c.content,
-        userName: c.user.nickname,
-        likedCount: c.likedCount || 0,
-      }));
-    }
-
-    if (data.comments && data.comments.length > 0) {
-      return data.comments.slice(0, limit).map((c: any) => ({
-        content: c.content,
-        userName: c.user.nickname,
-        likedCount: c.likedCount || 0,
-      }));
-    }
-
-    return [];
-  } catch (error) {
-    console.error('[netease-comments] Error:', error);
-    return [];
-  }
-}
-
-export async function fetchQQComments(songMid: string, limit: number = 15): Promise<CommentInfo[]> {
-  try {
-    const apiUrl = `https://c.y.qq.com/base/fcgi-bin/fcg_global_comment_h5.fcg?cmd=8&reqtype=1&biztype=1&topid=${songMid}&pagenum=1&pagesize=${limit}`;
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://y.qq.com/',
-      },
-      signal: AbortSignal.timeout(8000),
-    });
-
-    if (!response.ok) {
-      console.log('[qq-comments] API request failed:', response.status);
-      return [];
-    }
-
-    const data = await response.json();
-    
-    if (data.comment && data.comment.commentlist && data.comment.commentlist.length > 0) {
-      return data.comment.commentlist.slice(0, limit).map((c: any) => ({
-        content: c.rootcommentcontent || c.commentcontent || '',
-        userName: c.nickname || c.nick || '',
-        likedCount: c.praisenum || c.likecount || 0,
-      }));
-    }
-
-    return [];
-  } catch (error) {
-    console.error('[qq-comments] Error:', error);
-    return [];
-  }
-}

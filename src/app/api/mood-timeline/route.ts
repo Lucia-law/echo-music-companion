@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { streamLLM, LLMMessage } from '@/lib/api';
+import { buildTimelinePrompt } from '@/prompts/timeline';
 
 interface TimelineRecord {
   songName: string;
@@ -10,26 +11,6 @@ interface TimelineRecord {
   moodAtmosphere: string | null;
   createdAt: string;
 }
-
-const TIMELINE_SYSTEM_PROMPT = `你是一个安静的旁观者，看着一个人一段时间里听歌的轨迹。你要为每首歌写一句简短的心境描述。
-
-**核心原则**
-- 不要写得太具体、太针对性。不要出现"你刚毕业""你正在经历分手"这类推断
-- 要通用、有共鸣。写的是一种情绪状态，任何有过类似感受的人都能被触动
-- 语气像旁观者在轻轻描述，不是心理咨询师在做评估
-- 一句话，15-30字，像在日记本上随手写的一行
-
-**优先级**
-- 如果有用户的自述（何时何地、何思何想），优先基于这些来写
-- 如果没有自述，基于歌曲的情绪关键词和氛围来写
-- 不要直接引用用户的话，而是提炼出更通用的感受
-
-**输出格式**
-返回 JSON 数组，每项包含 date 和 text 字段。
-date 格式：M.D（如 4.28）
-text：一句心境描述。不要包含歌名，歌名会单独展示。
-
-只返回 JSON，不要其他内容。`;
 
 export async function POST(request: NextRequest) {
   const { records } = (await request.json()) as { records: TimelineRecord[] };
@@ -49,8 +30,10 @@ export async function POST(request: NextRequest) {
     return parts.join(' | ');
   }).join('\n');
 
+  const systemPrompt = buildTimelinePrompt(recordsSummary);
+
   const messages: LLMMessage[] = [
-    { role: 'system', content: TIMELINE_SYSTEM_PROMPT },
+    { role: 'system', content: systemPrompt },
     { role: 'user', content: recordsSummary },
   ];
 

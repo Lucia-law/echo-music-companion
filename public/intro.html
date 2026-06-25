@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>回响 — AI 音乐伴聊</title>
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f7f4ef;
+    --card: #ffffff;
+    --border: #e6dfd6;
+    --amber: #b8893f;
+    --amber-light: #d4a056;
+    --rose: #c47d7d;
+    --text: #2d2825;
+    --text-muted: #7a7268;
+    --text-dim: #b0a89e;
+    --mockup-bg: #f0ebe4;
+    --mockup-surface: #e8e2da;
+    --font-sans: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', -apple-system, system-ui, sans-serif;
+    --font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', Georgia, serif;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.8;
+  }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::selection { background: rgba(212, 160, 86, 0.2); color: var(--text); }
+
+  /* ─── Slides Container ─── */
+  .slides {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: transform;
+  }
+
+  .slide {
+    height: 100vh;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 48px;
+    position: relative;
+    overflow-y: auto;
+  }
+
+  /* ─── Navigation Dots ─── */
+  .nav-dots {
+    position: fixed;
+    right: 24px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .nav-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    border: 1px solid var(--amber);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.35s;
+    opacity: 0.35;
+  }
+  .nav-dot:hover { opacity: 0.7; }
+  .nav-dot.active {
+    background: var(--amber);
+    opacity: 1;
+    box-shadow: 0 0 8px rgba(184, 137, 63, 0.3);
+  }
+
+  /* ─── Hero ─── */
+  .slide-num {
+    position: fixed;
+    left: 24px;
+    bottom: 24px;
+    z-index: 100;
+    font-size: 13px;
+    font-family: var(--font-serif);
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    opacity: 0.5;
+  }
+
+  /* ─── Decorative background dots ─── */
+  .ambient {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    overflow: hidden;
+  }
+  .ambient .dot {
+    position: absolute;
+    border-radius: 50%;
+    background: var(--amber-light);
+    opacity: 0.08;
+    animation: float-up linear infinite;
+  }
+  @keyframes float-up {
+    0% { transform: translateY(0) scale(1); opacity: 0.06; }
+    50% { opacity: 0.12; }
+    100% { transform: translateY(-60px) scale(0.6); opacity: 0; }
+  }
+
+  /* ─── Hero ─── */
+  .hero { text-align: center; }
+  .hero small {
+    font-size: 13px; letter-spacing: 0.4em;
+    color: var(--amber);
+    margin-bottom: 28px;
+  }
+  .hero h1 {
+    font-family: var(--font-serif);
+    font-size: clamp(52px, 12vw, 88px);
+    font-weight: 200;
+    letter-spacing: 0.3em;
+    color: var(--text);
+    margin-bottom: 20px;
+  }
+  .hero .sub {
+    font-family: var(--font-serif);
+    font-size: clamp(18px, 3vw, 22px);
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    line-height: 2;
+    max-width: 460px;
+    margin-bottom: 48px;
+  }
+  .hero .divider {
+    width: 1px; height: 36px;
+    background: var(--border);
+    margin: 0 auto 28px;
+  }
+  .hero .scroll-hint {
+    font-size: 12px; letter-spacing: 0.3em;
+    color: var(--text-dim);
+    animation: pulse-hint 2.5s ease-in-out infinite;
+  }
+  .hero .down-arrow {
+    font-size: 16px;
+    display: block;
+    margin-top: 12px;
+    color: var(--amber);
+    opacity: 0.3;
+    animation: pulse-hint 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse-hint {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+  }
+
+  /* ─── Section common ─── */
+  .section-content {
+    width: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  .section-label {
+    font-size: 12px; letter-spacing: 0.35em;
+    color: var(--amber);
+    margin-bottom: 16px;
+  }
+  .section-title {
+    font-family: var(--font-serif);
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    margin-bottom: 12px;
+  }
+  .section-desc {
+    font-size: clamp(15px, 2.2vw, 17px);
+    color: var(--text-muted);
+    line-height: 2;
+    max-width: 560px;
+    margin-bottom: 44px;
+  }
+
+  /* ─── Feature grid (text + visual side by side) ─── */
+  .feature {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 48px;
+    align-items: center;
+  }
+  .feature.reverse { direction: rtl; }
+  .feature.reverse > * { direction: ltr; }
+
+  .feature-content { min-width: 0; }
+  .feature-number {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    color: var(--amber);
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+  }
+  .feature-title {
+    font-family: var(--font-serif);
+    font-size: clamp(21px, 3vw, 28px);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+  .feature-text {
+    font-size: clamp(15px, 2.2vw, 16px);
+    color: var(--text-muted);
+    line-height: 2.2;
+  }
+  .feature-text strong {
+    color: var(--amber);
+    font-weight: 500;
+  }
+
+  /* ─── Mockup (phone-like visual) ─── */
+  .feature-visual {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    max-height: 420px;
+    border-radius: 14px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 20px rgba(45, 40, 37, 0.04);
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+  }
+
+  .mockup-screen {
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    padding: 20px;
+    gap: 12px;
+    font-size: 14px;
+  }
+  .mockup-screen .status-bar {
+    display: flex; justify-content: space-between;
+    color: var(--text-muted);
+    font-size: 12px; letter-spacing: 0.1em;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .mockup-input {
+    background: var(--mockup-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    color: var(--text-muted);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+  .mockup-input .cursor {
+    display: inline-block;
+    width: 1px; height: 14px;
+    background: var(--amber-light);
+    opacity: 0.6;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 2px;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 0; }
+  }
+  .mockup-btn {
+    align-self: center;
+    padding: 10px 26px;
+    border: 1px solid var(--amber);
+    border-radius: 8px;
+    color: var(--amber);
+    opacity: 0.7;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+  }
+  .mockup-response {
+    background: var(--mockup-bg);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: var(--font-serif);
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 2;
+    letter-spacing: 0.04em;
+    flex: 1;
+  }
+  .mockup-response .hl { color: var(--amber); }
+  .mockup-response .em {
+    color: var(--amber);
+    font-style: normal;
+    font-weight: 500;
+  }
+
+  /* ─── Stars mockup ─── */
+  .mockup-stars {
+    width: 100%; height: 100%;
+    position: relative;
+    overflow: hidden;
+    background: var(--mockup-bg);
+  }
+  .mockup-stars .s {
+    position: absolute;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--amber);
+    opacity: 0.5;
+    cursor: default;
+    transition: opacity 0.3s;
+  }
+  .mockup-stars .s:hover { opacity: 0.9; }
+  .mockup-stars .halo {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(184, 137, 63, 0.08) 0%, transparent 70%);
+    animation: pulse-halo 3.5s ease-in-out infinite;
+  }
+  @keyframes pulse-halo {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.8; transform: scale(1.1); }
+  }
+
+  /* ─── Timeline card ─── */
+  .tl-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 36px;
+  }
+  .timeline-card {
+    width: 100%;
+    max-width: 580px;
+    padding: 28px;
+    border-radius: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 16px rgba(45, 40, 37, 0.04);
+  }
+  .timeline-card .tl-label {
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+  .tl-item {
+    display: flex; gap: 12px; align-items: flex-start;
+  }
+  .tl-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--amber-light);
+    opacity: 0.25;
+    margin-top: 5px;
+    flex-shrink: 0;
+  }
+  .tl-content { min-width: 0; }
+  .tl-date {
+    font-size: 13px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+  .tl-date .song {
+    font-style: normal;
+    color: var(--amber);
+    opacity: 0.65;
+    margin-left: 8px;
+  }
+  .tl-text {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    letter-spacing: 0.03em;
+    opacity: 0.75;
+  }
+
+  /* ─── CTA ─── */
+  .cta { text-align: center; }
+  .cta h2 {
+    font-family: var(--font-serif);
+    font-size: clamp(24px, 3.5vw, 32px);
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .cta p {
+    font-size: 15px;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-bottom: 28px;
+  }
+  .cta a {
+    display: inline-block;
+    padding: 14px 44px;
+    border: 1px solid var(--amber);
+    border-radius: 10px;
+    color: var(--amber);
+    font-size: 15px;
+    letter-spacing: 0.2em;
+    text-decoration: none;
+    transition: all 0.3s;
+  }
+  .cta a:hover {
+    background: rgba(184, 137, 63, 0.06);
+  }
+  .cta .divider {
+    width: 1px; height: 28px;
+    background: var(--border);
+    margin: 0 auto 24px;
+  }
+
+  /* ─── Footer ─── */
+  footer {
+    text-align: center;
+    padding: 20px 0 0;
+  }
+  footer p {
+    font-size: 12px;
+    letter-spacing: 0.3em;
+    color: var(--text-dim);
+  }
+
+  /* ─── Responsive ─── */
+  @media (max-width: 720px) {
+    .slide { padding: 32px 20px; }
+    .nav-dots { right: 12px; gap: 8px; }
+    .nav-dot { width: 6px; height: 6px; }
+    .feature {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .feature.reverse { direction: ltr; }
+    .feature.reverse > * { direction: ltr; }
+    .feature-visual { max-height: 300px; }
+    .section-desc { margin-bottom: 28px; }
+    .slide-num { left: 12px; bottom: 12px; }
+  }
+
+  /* ─── Fade-in on mount ─── */
+  .slide { opacity: 0; transition: opacity 0.6s ease; }
+  .slide.active { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="ambient" id="ambient"></div>
+
+<!-- Navigation dots -->
+<div class="nav-dots" id="navDots"></div>
+
+<!-- Slide indicator -->
+<div class="slide-num" id="slideNum"></div>
+
+<!-- Slide indicator -->
+<div class="slide-num" id="slideNum"></div>
+
+<!-- ─── Slides ─── -->
+<div class="slides" id="slides">
+
+  <!-- Slide 0: Hero -->
+  <div class="slide hero" data-index="0" data-label="首页">
+    <small>AI Music Companion</small>
+    <h1>回响</h1>
+    <p class="sub">把一首歌的链接丢进来<br>有人陪你聊一聊这首歌</p>
+    <div class="divider"></div>
+    <p class="scroll-hint">向下滑动</p>
+    <span class="down-arrow">↓</span>
+  </div>
+
+  <!-- Slide 1: Feature 01 - 解析 -->
+  <div class="slide" data-index="1" data-label="解析">
+    <div class="section-content">
+      <div class="section-label">FEATURE 01 · 解析</div>
+      <h2 class="section-title">贴个链接，剩下交给它</h2>
+      <p class="section-desc">网易云音乐、QQ 音乐，贴进去自动识别歌名、歌手。</p>
+      <div class="feature">
+        <div class="feature-content">
+          <p class="feature-number">01</p>
+          <h3 class="feature-title">智能识别</h3>
+          <p class="feature-text">
+            贴入链接自动识别歌名、歌手。<br><br>
+            你只需要做一件事：<strong>分享一首歌</strong>。
+          </p>
+        </div>
+        <div class="feature-visual">
+          <div class="mockup-screen">
+            <div class="status-bar">
+              <span>回响</span>
+              <span>22:14</span>
+            </div>
+            <div class="mockup-input">
+              https://music.163.com/song/1387099
+              <span class="cursor"></span>
+            </div>
+            <div class="mockup-btn">听这首歌</div>
+            <div class="mockup-response" style="flex:none;max-height:120px;overflow:hidden;position:relative">
+              <div style="display:flex;gap:8px;margin-bottom:8px;font-family:var(--font-sans);color:var(--text-muted);letter-spacing:0.03em">
+                <span>偶然 · 梁心颐</span>
+              </div>
+              <div>识别完成</div>
+              <div style="position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent, var(--mockup-bg))"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 2: Feature 02 - 对话 -->
+  <div class="slide" data-index="2" data-label="对话">
+    <div class="section-content">
+      <div class="section-label">FEATURE 02 · 对话</div>
+      <h2 class="section-title">AI 陪聊，像朋友那样</h2>
+      <p class="section-desc">不是打分，不是乐评——像朋友深夜聊歌，每首歌的回应都不一样。</p>
+      <div class="feature">
+        <div class="feature-visual">
+          <div class="mockup-screen">
+            <div class="status-bar">
+              <span>回响</span>
+              <span>22:15</span>
+            </div>
+            <div class="mockup-response" style="flex:1">
+              <div style="display:flex;gap:6px;margin-bottom:10px;font-family:var(--font-sans);color:var(--text-muted);font-size:11px;letter-spacing:0.03em">
+                <span>偶然 · 梁心颐</span>
+                <span style="opacity:0.4">·</span>
+                <span style="opacity:0.6">凌晨一点</span>
+              </div>
+              <div>
+                前奏的钢琴像雨滴落在凌晨的窗沿。<br><br>
+                她唱「<span class="hl">当偶然遇见必然</span>」，声音里有种说不清的释然。有个评论说这首歌是在某个转机机场的候机厅第一次听到的——确实，这歌有种「在路上的停顿感」，像一个人在陌生的城市等下一班飞机，翻着手机相册的表情。<br><br>
+                与其说是在唱相遇，不如说是在唱一种<span class="em">温柔的认命</span>。
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="feature-content">
+          <p class="feature-number">02</p>
+          <h3 class="feature-title">有温度的回应</h3>
+          <p class="feature-text">
+            每一首歌，AI 都会给你一段有温度的回应。<br><br>
+            像朋友深夜聊歌的感觉。
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 3: Feature 03 - 倾诉 -->
+  <div class="slide" data-index="3" data-label="倾诉">
+    <div class="section-content">
+      <div class="section-label">FEATURE 03 · 倾诉</div>
+      <h2 class="section-title">听到一半，有话想说</h2>
+      <p class="section-desc">听完 AI 的回应后，如果你也有话想说，写下此刻的想法，AI 会接着你的话说下去。</p>
+      <div class="feature">
+        <div class="feature-content">
+          <p class="feature-number">03</p>
+          <h3 class="feature-title">对话，不是独白</h3>
+          <p class="feature-text">
+            听完 AI 的回应后，你也可以写下此刻的想法。<br><br>
+            AI 会接着你的话说下去。
+          </p>
+        </div>
+        <div class="feature-visual">
+          <div class="mockup-screen" style="justify-content:center">
+            <div style="width:100%;text-align:center">
+              <div class="mockup-input" style="margin-bottom:8px;text-align:left">
+                凌晨三点的窗边
+              </div>
+              <div class="mockup-input" style="margin-bottom:16px;text-align:left">
+                想起了一些很久没联系的人
+              </div>
+              <div class="mockup-btn">说完了</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 4: Feature 04 - 加入 -->
+  <div class="slide" data-index="4" data-label="加入">
+    <div class="section-content">
+      <div class="section-label">FEATURE 04 · 加入</div>
+      <h2 class="section-title">取个名字，设个暗语</h2>
+      <p class="section-desc">取个名字设个暗语，就是你的回响之地了。</p>
+      <div class="feature">
+        <div class="feature-content">
+          <p class="feature-number">04</p>
+          <h3 class="feature-title">命名即创建</h3>
+          <p class="feature-text">
+            输入你想要的名字，设一个暗语。<br><br>
+            取个名字就是你的了。
+          </p>
+        </div>
+        <div class="feature-visual">
+          <div class="mockup-screen" style="justify-content:center">
+            <div style="width:100%;max-width:280px;margin:0 auto">
+              <div class="mockup-input" style="text-align:left;margin-bottom:4px">
+                你的回响之地名字
+              </div>
+              <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);letter-spacing:0.05em;padding:0 2px;margin-bottom:16px">
+                <span>示例：深夜电台 / 凌晨两点半</span>
+                <span style="color:var(--amber);opacity:0.6">这个名字可用</span>
+              </div>
+              <div class="mockup-input" style="text-align:left;margin-bottom:4px">
+                ●●●●●●●●
+              </div>
+              <p style="font-size:10px;color:var(--text-dim);letter-spacing:0.05em;padding:0 2px;margin-bottom:20px">字母、数字或符号，至少6位</p>
+              <div class="mockup-btn" style="align-self:center">进入</div>
+              <p style="font-size:10px;color:var(--text-dim);letter-spacing:0.05em;text-align:center;margin-top:20px">还没有回响之地？取个名字就是你的了</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 5: Feature 05 - 空间 -->
+  <div class="slide" data-index="5" data-label="空间">
+    <div class="section-content tl-section">
+      <div style="width:100%">
+        <div class="section-label">FEATURE 05 · 空间</div>
+        <h2 class="section-title">回响之地</h2>
+        <p class="section-desc">把名字和暗语告诉朋友，他们也能进来，共享同一个回响之地，彼此的音乐回忆都会留在这里。</p>
+      </div>
+      <div class="feature" style="width:100%">
+        <div class="feature-visual" style="max-height:300px">
+          <div class="mockup-stars" id="starsMockup">
+            <div class="halo" style="width:56px;height:56px;left:28px;top:38px"></div>
+            <div class="s" style="left:30px;top:50px;opacity:0.55">偶然</div>
+            <div class="halo" style="width:44px;height:44px;left:138px;top:85px"></div>
+            <div class="s" style="left:140px;top:97px;opacity:0.45">搁浅</div>
+            <div class="halo" style="width:50px;height:50px;left:76px;top:145px"></div>
+            <div class="s" style="left:78px;top:157px;opacity:0.5">山丘</div>
+            <div class="halo" style="width:40px;height:40px;left:198px;top:28px"></div>
+            <div class="s" style="left:200px;top:40px;opacity:0.4">安和桥</div>
+            <div class="halo" style="width:46px;height:46px;left:216px;top:165px"></div>
+            <div class="s" style="left:218px;top:177px;opacity:0.55">小半</div>
+            <div class="halo" style="width:34px;height:34px;left:148px;top:205px"></div>
+            <div class="s" style="left:150px;top:215px;opacity:0.35">理想三旬</div>
+          </div>
+        </div>
+        <div class="feature-content">
+          <p class="feature-number">05</p>
+          <h3 class="feature-title">星云式共鸣</h3>
+          <p class="feature-text">
+            每首歌都化作一颗星，排列成星云。<strong>点开星星</strong>能看到当时 AI 的回应。<br><br>
+            下面有一条时间脉络，记录了这个空间里所有人的音乐足迹。
+          </p>
+        </div>
+      </div>
+      <!-- Timeline -->
+      <div class="timeline-card">
+        <div class="tl-label">脉 络</div>
+        <div style="border-left:1px solid var(--border);padding-left:20px;display:flex;flex-direction:column;gap:20px">
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-date">6.9  凌晨<span class="song">偶然</span></div>
+              <div class="tl-text">前奏的钢琴像雨滴落在凌晨的窗沿...</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-date">6.8  晚上<span class="song">搁浅</span></div>
+              <div class="tl-text">她说「原谅我这一首不再动听」的时候...</div>
+            </div>
+          </div>
+          <div class="tl-item">
+            <div class="tl-dot"></div>
+            <div class="tl-content">
+              <div class="tl-date">6.7  下午<span class="song">山丘</span></div>
+              <div class="tl-text">越过山丘，才发现无人等候——这句词放在现在听...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Slide 6: CTA + Footer -->
+  <div class="slide" data-index="6" data-label="开始">
+    <div class="cta">
+      <h2>发一首歌的链接<br>有人陪你听</h2>
+      <div class="divider"></div>
+      <a href="/">开始体验</a>
+    </div>
+    <footer style="position:absolute;bottom:40px;left:0;right:0">
+      <p>回 响 · ECHO</p>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+  // Background floating dots
+  const ambient = document.getElementById('ambient');
+  for (let i = 0; i < 30; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    const size = 2 + Math.random() * 4;
+    dot.style.cssText = `
+      width: ${size}px; height: ${size}px;
+      left: ${Math.random() * 100}%;
+      top: ${Math.random() * 100}%;
+      animation-duration: ${6 + Math.random() * 8}s;
+      animation-delay: ${Math.random() * 6}s;
+    `;
+    ambient.appendChild(dot);
+  }
+
+  // ─── Slide Navigation ───
+
+  const slides = document.querySelectorAll('.slide');
+  const totalSlides = slides.length;
+  let current = 0;
+  let isAnimating = false;
+
+  // Create nav dots
+  const navDots = document.getElementById('navDots');
+  slides.forEach((s, i) => {
+    const dot = document.createElement('button');
+    dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+    dot.setAttribute('aria-label', `第 ${i + 1} 页`);
+    dot.addEventListener('click', () => goTo(i));
+    navDots.appendChild(dot);
+  });
+
+  const slideNum = document.getElementById('slideNum');
+
+  function updateSlideNum() {
+    slideNum.textContent = `${current + 1} / ${totalSlides}`;
+  }
+
+  function goTo(index) {
+    if (isAnimating || index === current || index < 0 || index >= totalSlides) return;
+    isAnimating = true;
+
+    // Update slides transform
+    const slidesEl = document.getElementById('slides');
+    slidesEl.style.transform = `translateY(-${index * 100}vh)`;
+
+    // Update active states
+    slides.forEach(s => s.classList.remove('active'));
+    slides[index].classList.add('active');
+
+    // Update dots
+    document.querySelectorAll('.nav-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === index);
+    });
+
+    current = index;
+    updateSlideNum();
+
+    // Re-trigger floating animation on the active slide's elements
+    setTimeout(() => { isAnimating = false; }, 650);
+  }
+
+  function goNext() { goTo(current + 1); }
+  function goPrev() { goTo(current - 1); }
+
+  // Keyboard
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+      e.preventDefault();
+      goNext();
+    } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goPrev();
+    }
+  });
+
+  // Mouse wheel
+  let wheelTimeout = null;
+  document.addEventListener('wheel', (e) => {
+    if (wheelTimeout) return;
+    wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 800);
+    if (e.deltaY > 0) goNext();
+    else goPrev();
+  }, { passive: true });
+
+  // Touch support
+  let touchStartY = 0;
+  document.addEventListener('touchstart', (e) => {
+    touchStartY = e.changedTouches[0].screenY;
+  }, { passive: true });
+  document.addEventListener('touchend', (e) => {
+    const diff = touchStartY - e.changedTouches[0].screenY;
+    if (Math.abs(diff) > 40) {
+      if (diff > 0) goNext();
+      else goPrev();
+    }
+  }, { passive: true });
+
+  // Init
+  slides[0].classList.add('active');
+  updateSlideNum();
+</script>
+
+</body>
+</html>

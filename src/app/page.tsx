@@ -3,13 +3,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-type AppState = 'idle' | 'parsing' | 'searching' | 'streaming' | 'done' | 'error';
+type AppState = 'idle' | 'parsing' | 'streaming' | 'done' | 'error';
 
 interface SongInfo {
   songName: string;
   artist: string;
   platform: string;
-  songId?: string;
 }
 
 interface SongMood {
@@ -30,7 +29,6 @@ export default function Home() {
   const [state, setState] = useState<AppState>('idle');
   const [songInfo, setSongInfo] = useState<SongInfo | null>(null);
   const [responseText, setResponseText] = useState('');
-  const [secondResponse, setSecondResponse] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [fragment, setFragment] = useState('');
   const [songMood, setSongMood] = useState<SongMood | null>(null);
@@ -40,6 +38,12 @@ export default function Home() {
   const [whenWhere, setWhenWhere] = useState('');
   const [thoughts, setThoughts] = useState('');
   const [isSubmittingConfession, setIsSubmittingConfession] = useState(false);
+
+  // 初始想法弹窗
+  const [showInitialModal, setShowInitialModal] = useState(false);
+  const [initialWhenWhere, setInitialWhenWhere] = useState('');
+  const [initialThoughts, setInitialThoughts] = useState('');
+  const initialResolveRef = useRef<((value: { whenWhere: string; thoughts: string } | null) => void) | null>(null);
 
   // 回响之地
   const [currentSpaceName, setCurrentSpaceName] = useState<string | null>(null);
@@ -51,12 +55,9 @@ export default function Home() {
   const [spaceExists, setSpaceExists] = useState<boolean | null>(null);
   const spaceCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 记录保存
-  const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
+  // 记录缓存
   const [cachedLyrics, setCachedLyrics] = useState('');
-  const [cachedComments, setCachedComments] = useState('');
-  const [hasConfessed, setHasConfessed] = useState(false);
-
+  const [currentRecordId, setCurrentRecordId] = useState<string | null>(null);
   const [stardust, setStardust] = useState<React.ReactNode[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const responseEndRef = useRef<HTMLDivElement>(null);
@@ -68,7 +69,6 @@ export default function Home() {
       setCurrentSpaceName(saved);
       setSpaceNameInput(saved);
     } else {
-      // 没有保存过空间名，首次访问直接弹出
       setShowSpaceCard(true);
     }
   }, []);
@@ -98,8 +98,8 @@ export default function Home() {
               <span
                 style={{
                   fontSize: starSize,
-                  color: `oklch(0.82 0.08 75 / ${opacity})`,
-                  textShadow: `0 0 ${starSize}px oklch(0.82 0.08 75 / ${opacity * 0.4})`,
+                  color: `oklch(0.95 0.005 260 / ${Math.min(opacity * 2, 1)})`,
+                  textShadow: `0 0 ${starSize}px oklch(0.95 0.005 260 / 0.8), 0 0 ${starSize * 2}px oklch(0.95 0.005 260 / 0.4), 0 0 ${starSize * 4}px oklch(0.95 0.005 260 / 0.15)`,
                   lineHeight: 1,
                 }}
               >
@@ -110,9 +110,9 @@ export default function Home() {
                 style={{
                   width: 1 + Math.random() * 1.5,
                   height: 1 + Math.random() * 1.5,
-                  background: `oklch(0.82 0.08 75 / ${opacity})`,
+                  background: `oklch(0.95 0.005 260 / ${Math.min(opacity * 2, 1)})`,
                   borderRadius: '50%',
-                  boxShadow: `0 0 3px oklch(0.82 0.08 75 / ${opacity * 0.5})`,
+                  boxShadow: `0 0 3px oklch(0.95 0.005 260 / 0.8), 0 0 6px oklch(0.95 0.005 260 / 0.4), 0 0 12px oklch(0.95 0.005 260 / 0.15)`,
                 }}
               />
             )}
@@ -126,7 +126,7 @@ export default function Home() {
     if (responseEndRef.current) {
       responseEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [responseText, secondResponse]);
+  }, [responseText]);
 
   // 检查空间名是否已存在
   const checkSpaceExists = useCallback(async (name: string) => {
@@ -142,36 +142,6 @@ export default function Home() {
       setSpaceExists(null);
     }
   }, []);
-
-  // 保存记录到回响之地
-  const saveRecord = useCallback(async (data: {
-    songName: string;
-    artist: string;
-    platform: string;
-    aiResponse: string;
-    moodKeywords?: string[];
-    moodAtmosphere?: string;
-  }) => {
-    if (!currentSpaceName) return null;
-    try {
-      const res = await fetch('/api/records', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          spaceName: currentSpaceName,
-          ...data,
-        }),
-      });
-      const result = await res.json();
-      if (result.id) {
-        setCurrentRecordId(result.id);
-        return result.id;
-      }
-    } catch {
-      // 静默失败，不影响主流程
-    }
-    return null;
-  }, [currentSpaceName]);
 
   // 更新记录（倾诉后）
   const updateRecord = useCallback(async (recordId: string, data: {
@@ -191,101 +161,65 @@ export default function Home() {
     }
   }, []);
 
-  // 分析情绪并保存记录
-  const analyzeAndSave = useCallback(async (song: SongInfo, aiText: string) => {
-    let mood: SongMood | null = null;
-    try {
-      const moodRes = await fetch('/api/analyze-mood', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songName: song.songName,
-          artist: song.artist,
-          responseText: aiText,
-        }),
-      });
-      const moodData = await moodRes.json();
-      if (moodData.keywords && moodData.atmosphere) {
-        mood = moodData;
-        setSongMood(mood);
-      }
-    } catch {
-      // 静默失败
-    }
+  // 弹出初始想法弹窗，等待用户输入或跳过
+  const askInitialThoughts = useCallback((): Promise<{ whenWhere: string; thoughts: string } | null> => {
+    return new Promise((resolve) => {
+      initialResolveRef.current = resolve;
+      setInitialWhenWhere('');
+      setInitialThoughts('');
+      setShowInitialModal(true);
+    });
+  }, []);
 
-    if (currentSpaceName) {
-      await saveRecord({
-        songName: song.songName,
-        artist: song.artist,
-        platform: song.platform,
-        aiResponse: aiText,
-        moodKeywords: mood?.keywords,
-        moodAtmosphere: mood?.atmosphere,
-      });
-    }
-  }, [currentSpaceName, saveRecord]);
+  const handleInitialSubmit = useCallback(() => {
+    const result = { whenWhere: initialWhenWhere.trim(), thoughts: initialThoughts.trim() };
+    setShowInitialModal(false);
+    initialResolveRef.current?.(result);
+  }, [initialWhenWhere, initialThoughts]);
+
+  const handleInitialSkip = useCallback(() => {
+    setShowInitialModal(false);
+    initialResolveRef.current?.(null);
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     const trimmedLink = link.trim();
     if (!trimmedLink) return;
 
+    // 先弹窗让用户选择是否输入想法
+    const userInput = await askInitialThoughts();
+
     setState('parsing');
     setSongInfo(null);
     setResponseText('');
-    setSecondResponse('');
     setErrorMessage('');
     setShowConfession(false);
     setWhenWhere('');
     setThoughts('');
     setSongMood(null);
+
+    setCachedLyrics('');
     setCurrentRecordId(null);
-    setHasConfessed(false);
 
     try {
-      const parseRes = await fetch('/api/parse-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: trimmedLink }),
-      });
-
-      const parseData = await parseRes.json();
-
-      if (!parseRes.ok || parseData.error) {
-        setState('error');
-        setErrorMessage(parseData.error || '无法识别这首歌');
-        return;
-      }
-
-      const song: SongInfo = {
-        songName: parseData.songName,
-        artist: parseData.artist,
-        platform: parseData.platform,
-        songId: parseData.songId,
-      };
-      setSongInfo(song);
-
-      setState('searching');
-
-      const companionRes = await fetch('/api/music-companion', {
+      const res = await fetch('/api/process-song', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          songName: song.songName,
-          artist: song.artist,
-          platform: song.platform,
-          songId: song.songId,
+          url: trimmedLink,
+          spaceName: currentSpaceName || undefined,
+          whenWhere: userInput?.whenWhere || undefined,
+          thoughts: userInput?.thoughts || undefined,
         }),
       });
 
-      if (!companionRes.ok) {
+      if (!res.ok) {
         setState('error');
-        setErrorMessage('生成回复时出错了，请重试');
+        setErrorMessage('出错了，请重试');
         return;
       }
 
-      setState('streaming');
-
-      const reader = companionRes.body?.getReader();
+      const reader = res.body?.getReader();
       if (!reader) {
         setState('error');
         setErrorMessage('连接中断，请重试');
@@ -294,6 +228,7 @@ export default function Home() {
 
       const decoder = new TextDecoder();
       let fullText = '';
+      let currentSong: SongInfo | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -303,39 +238,68 @@ export default function Home() {
         const lines = chunk.split('\n');
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              continue;
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6);
+          if (data === '[DONE]') continue;
+
+          try {
+            const parsed = JSON.parse(data);
+
+            if (parsed.type === 'songInfo') {
+              currentSong = {
+                songName: parsed.songName,
+                artist: parsed.artist,
+                platform: parsed.platform,
+              };
+              setSongInfo(currentSong);
+              setState('streaming');
             }
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                fullText += parsed.content;
-                setResponseText(fullText);
-              }
-              if (parsed.type === 'context') {
-                setCachedLyrics(parsed.lyrics || '');
-                setCachedComments(parsed.comments || '');
-              }
-              if (parsed.error) {
-                setState('error');
-                setErrorMessage(parsed.error);
-              }
-            } catch {
-              // skip
+
+            if (parsed.content) {
+              fullText += parsed.content;
+              setResponseText(fullText);
             }
+
+            if (parsed.type === 'context') {
+              setCachedLyrics(parsed.lyrics || '');
+              if (parsed.recordId) setCurrentRecordId(parsed.recordId);
+            }
+
+            if (parsed.error) {
+              setState('error');
+              setErrorMessage(parsed.error);
+              return;
+            }
+          } catch {
+            // skip malformed data
           }
         }
       }
 
       setState('done');
-      analyzeAndSave(song, fullText);
+
+      // 异步分析情绪（不阻塞主流程）
+      if (currentSong) {
+        fetch('/api/analyze-mood', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            songName: currentSong.songName,
+            artist: currentSong.artist,
+            responseText: fullText,
+          }),
+        })
+          .then(r => r.json())
+          .then(mood => {
+            if (mood.keywords && mood.atmosphere) setSongMood(mood);
+          })
+          .catch(() => {});
+      }
     } catch {
       setState('error');
       setErrorMessage('网络连接出了问题，请重试');
     }
-  }, [link, analyzeAndSave]);
+  }, [link, currentSpaceName, askInitialThoughts]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && state === 'idle') {
@@ -349,14 +313,16 @@ export default function Home() {
     setState('idle');
     setSongInfo(null);
     setResponseText('');
-    setSecondResponse('');
     setErrorMessage('');
     setShowConfession(false);
     setWhenWhere('');
     setThoughts('');
     setSongMood(null);
+
+    setCachedLyrics('');
     setCurrentRecordId(null);
-    setHasConfessed(false);
+    setInitialWhenWhere('');
+    setInitialThoughts('');
     setFragment(idleFragments[Math.floor(Math.random() * idleFragments.length)]);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
@@ -379,7 +345,6 @@ export default function Home() {
           whenWhere: whenWhere.trim(),
           thoughts: thoughts.trim(),
           lyrics: cachedLyrics,
-          comments: cachedComments,
         }),
       });
 
@@ -424,11 +389,10 @@ export default function Home() {
       }
 
       setIsSubmittingConfession(false);
-      setHasConfessed(true);
 
-      // 更新记录：覆盖 ai_response 为最终版本
+      // 更新记录
       if (currentRecordId) {
-        await updateRecord(currentRecordId, {
+        updateRecord(currentRecordId, {
           userWhenWhere: whenWhere.trim(),
           userThoughts: thoughts.trim(),
           aiSecondResponse: fullText,
@@ -438,7 +402,7 @@ export default function Home() {
     } catch {
       setIsSubmittingConfession(false);
     }
-  }, [songInfo, responseText, whenWhere, thoughts, isSubmittingConfession, currentRecordId, updateRecord]);
+  }, [songInfo, responseText, whenWhere, thoughts, isSubmittingConfession, cachedLyrics, currentRecordId, updateRecord]);
 
   // 进入/创建回响之地
   const handleSpaceSubmit = useCallback(async () => {
@@ -530,7 +494,7 @@ export default function Home() {
                 setShowSpaceCard(true);
               }
             }}
-            className="group font-serif text-warm-amber/75 text-2xl tracking-[0.15em] hover:text-warm-amber transition-colors duration-300"
+            className="group font-serif text-warm-text/60 text-2xl tracking-[0.15em] hover:text-warm-text/90 transition-colors duration-300"
           >
             {currentSpaceName ? `✦ ${currentSpaceName}` : '✦ 回响之地'}
           </button>
@@ -587,6 +551,63 @@ export default function Home() {
               )}
             </div>
           </div>
+
+          {/* 初始想法弹窗 */}
+          {showInitialModal && (
+            <div className="fixed inset-0 z-40 flex items-center justify-center px-6">
+              <div
+                className="absolute inset-0 bg-warm-bg/80 backdrop-blur-sm"
+                onClick={handleInitialSkip}
+              />
+              <div className="relative bg-warm-surface/90 backdrop-blur-md border border-warm-border/40 rounded-xl p-8 w-full max-w-sm animate-fade-up">
+                <p className="font-serif text-warm-text/60 text-sm tracking-wider text-center mb-8">
+                  这首歌对你来说，是什么样子
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-warm-text-dim/50 text-xs tracking-wider mb-2">
+                      何时 · 何地
+                    </label>
+                    <input
+                      type="text"
+                      value={initialWhenWhere}
+                      onChange={(e) => setInitialWhenWhere(e.target.value)}
+                      placeholder="凌晨三点的窗边"
+                      className="w-full bg-warm-bg/60 border border-warm-border/30 rounded-lg px-4 py-3 text-warm-text text-sm placeholder:text-warm-text-dim/30 outline-none focus:border-warm-amber/30 transition-colors duration-300"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-warm-text-dim/50 text-xs tracking-wider mb-2">
+                      何思 · 何想
+                    </label>
+                    <input
+                      type="text"
+                      value={initialThoughts}
+                      onChange={(e) => setInitialThoughts(e.target.value)}
+                      placeholder="想起了一个人"
+                      className="w-full bg-warm-bg/60 border border-warm-border/30 rounded-lg px-4 py-3 text-warm-text text-sm placeholder:text-warm-text-dim/30 outline-none focus:border-warm-amber/30 transition-colors duration-300"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-6 mt-8">
+                  <button
+                    onClick={handleInitialSkip}
+                    className="text-warm-text-dim/40 text-sm tracking-wide hover:text-warm-text-dim/70 transition-colors duration-300"
+                  >
+                    跳过
+                  </button>
+                  <button
+                    onClick={handleInitialSubmit}
+                    className="px-6 py-2.5 rounded-lg bg-warm-amber/15 border border-warm-amber/30 text-warm-amber/90 text-sm tracking-wide hover:bg-warm-amber/25 hover:text-warm-amber transition-all duration-300"
+                  >
+                    开始
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Song Info */}
@@ -612,10 +633,10 @@ export default function Home() {
         )}
 
         {/* Loading */}
-        {(state === 'parsing' || state === 'searching') && (
+        {state === 'parsing' && (
           <div className="py-20 animate-fade-in">
             <p className="text-warm-text-dim/50 text-xs tracking-[0.15em] text-center">
-              {state === 'parsing' ? '在听' : '在想'}
+              在听
             </p>
             <div className="flex justify-center gap-1.5 mt-4">
               <span className="w-1 h-1 rounded-full bg-warm-amber/40 pulse-dot-1" />
@@ -645,14 +666,12 @@ export default function Home() {
                   >
                     再听一首
                   </button>
-                  {!hasConfessed && (
-                    <button
-                      onClick={() => setShowConfession(true)}
-                      className="text-warm-amber/60 text-sm tracking-wide hover:text-warm-amber/80 transition-colors duration-300"
-                    >
-                      你心里的版本
-                    </button>
-                  )}
+                  <button
+                    onClick={() => setShowConfession(true)}
+                    className="text-warm-amber/60 text-sm tracking-wide hover:text-warm-amber/80 transition-colors duration-300"
+                  >
+                    也许，不止这样
+                  </button>
                 </div>
               </div>
             )}
